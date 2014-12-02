@@ -198,7 +198,7 @@ struct Graph {
 		// 1D indices for alt-SVM
 		pidx.resize(nparts + 1);
 		pidx[0] = 0;
-		for (int i = 0; i <= nparts; ++i) {
+		for (int i = 1; i <= nparts; ++i) {
 			pidx[i] = pidx[i - 1] + tmp[i - 1].size();	
 		}
 

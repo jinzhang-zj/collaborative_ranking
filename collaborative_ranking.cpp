@@ -83,10 +83,10 @@ void Problem::alt_rankSVM () {
 	if (this->is_allocated) {
 		this->de_allocate();
 	}
-	this->is_allocated = true;
 
-	this->U = new double (this->n_users * this->rank);
-	this->V = new double (this->n_items * this->rank);
+	this->is_allocated = true;
+	this->U = new double [this->n_users * this->rank];
+	this->V = new double [this->n_items * this->rank];
 
 	srand(time(NULL));
 	for (int i = 0; i < this->n_users; ++i) {
@@ -101,8 +101,8 @@ void Problem::alt_rankSVM () {
 	A = new struct feature_node*[this->n_train_comps];
 	for (int i = 0; i < this->n_train_comps; ++i) {
 		A[i] = new struct feature_node[this->rank + 1];
-		for (int j = 0; j < this->rank; j++) {
-			A[i][j].index = j;
+		for (int j = 0; j < this->rank; ++j) {
+			A[i][j].index = j + 1;
 		}
 		A[i][this->rank].index = -1;
 	}
@@ -111,7 +111,7 @@ void Problem::alt_rankSVM () {
 	for (int i = 0; i < this->n_train_comps; ++i) {
 		B[i] = new struct feature_node[this->rank * 2 + 1];
 		for (int j = 0; j < 2 * this->rank; ++j) {
-			B[i][j].index = j;
+			B[i][j].index = j + 1;
 		}
 		B[i][this->rank * 2].index = -1;
 	}
@@ -220,13 +220,21 @@ double Problem::compute_testerror() {
 }
 
 void Problem::de_allocate () {
-	delete this->U;
-	delete this->V;
+	delete [] this->U;
+	delete [] this->V;
+	this->U = NULL;
+	this->V = NULL;
 }
 
 int main (int argc, char* argv[]) {
 	Problem p(10, 16);		// rank = 10, #partition = 16
+	if (argc < 2) {
+		cout << "Solve collaborative ranking problem with given training/testing data set" << endl;
+		cout << "Usage ./collaborative_ranking  : [training file] [testing file] " << endl;
+		return 0;
+	}
+
 	p.read_data(argv[1], argv[2]);
-	// p.alt_rankSVM();
+	p.alt_rankSVM();
 	return 0;
 }
