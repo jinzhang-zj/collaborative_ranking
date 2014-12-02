@@ -23,13 +23,14 @@
 #include <iostream>
 #include <fstream>
 #include "collaborative_ranking.h"
+#include "linear.h"
 
 using namespace std;
 
 class Problem {
 	bool is_allocated, is_clustered;
 	int n_users, n_items, n_train_comps, n_test_comps; 	// number of users/items in training sample, number of samples in traing and testing data set
-	int rank, lambda;				// parameters
+	int rank, lambda, nparts;				// parameters
 	double *U, *V;						// low rank U, V
 	double alpha, beta;					// parameter for sgd
 	Graph g;						// Graph used for clustering training data
@@ -49,7 +50,7 @@ class Problem {
 Problem::Problem (int r, int np): g(np) {
 	this->rank = r;
 	this->is_allocated = false;
-	//this->g(np);
+	this->nparts = np;
 }
 
 void Problem::read_data (char* train_file, char* test_file) {
@@ -88,10 +89,10 @@ void Problem::alt_rankSVM () {
 	this->V = new double (this->n_items * this->rank);
 
 	srand(time(NULL));
-	for (int i = 0; i < this->n; ++i) {
+	for (int i = 0; i < this->n_users; ++i) {
 		U[i] = ((double) rand() / RAND_MAX);
 	}
-	for (int i = 0; i < this->n; ++i) {
+	for (int i = 0; i < this->n_users; ++i) {
 		V[i] = ((double) rand() / RAND_MAX);
 	}
 
@@ -118,7 +119,7 @@ void Problem::alt_rankSVM () {
 	for (int iter = 0; iter < 20; ++iter) {
 		// Learning U
 		// #pragma omp parallel for
-		for (int i = 0; i < this->n; ++i) {
+		for (int i = 0; i < this->n_users; ++i) {
 			for (int j = this->g.uidx[i]; j < this->g.uidx[i + 1]; ++j) {
 				double *V1 = &V[this->g.ucmp[j].item1_id * this->rank];
 				double *V2 = &V[this->g.ucmp[j].item2_id * this->rank];
@@ -143,34 +144,34 @@ void Problem::alt_rankSVM () {
 			param.solver_type = L2R_L2LOSS_SVC_DUAL;
 			param.C = 1.;
 			struct model *M;
-			if check_parameter(param) {
+			if (!check_parameter(&P, &param) ) {
 				// run SVM
 				M = train(&P, &param);
 				// store the result
 				for (int j = 0; j < rank; ++j) {
-					U[i * rank + j] = M.w[j];
+					U[i * rank + j] = M->w[j];
 				}
-				free_and_destory_model(&M);
+				//free_and_destory_model(&M);
 			}
 		}
 
 		// Learning V 
 		// #pragma omp parallel for
-		for (int i = 0; i < k; ++i) {
+		for (int i = 0; i < this->nparts; ++i) {
 			// solve the SVM problem sequentially for each sample in the partition
-			for (int j = this->pidx[i]; j < this->pidx[i + 1]; ++j) {
+			for (int j = this->g.pidx[i]; j < this->g.pidx[i + 1]; ++j) {
 				// generate the training set for V using U
-				for (int s = 0; s < rank; ++s) {
-					B[j][s].value = U[this->pcmp[j].user_id * rank + s];		// U_i
-					B[j][s + rank].value = -U[this->pcmp[j].user_id * rank + s];	// -U_i
+				for (int s = 0; s < this->rank; ++s) {
+					B[j][s].value = U[this->g.pcmp[j].user_id * this->rank + s];		// U_i
+					B[j][s + rank].value = -U[this->g.pcmp[j].user_id * this->rank + s];	// -U_i
 				}		
 			
 				// call LIBLINEAR with U[i*rank], B[j]
 				struct problem P;
 				P.l = 1;
 				P.n = rank * 2;
-				double *y = 1.;
-				P.y = y;
+				double y = 1.;
+				P.y = &y;
 				P.x = &B[j];
 				P.bias = -1;
 
@@ -179,16 +180,16 @@ void Problem::alt_rankSVM () {
 				param.C = 1.;
 
 				struct model *M;
-				if check_parameter(param) {
+				if (!check_parameter(&P, &param) ) {
 					// run SVM
 					M = train(&P, &param);
 
 					// store the result
 					for (int s = 0; s < rank; ++s) {
-						V[this->pcmp[j].item1_id * rank + s] = M.w[s];			// other threads might be doing the same thing
-						V[this->pcmp[j].item2_id * rank + s] = M.w[s + rank];		// so add lock to the two steps is another option.
+						V[this->g.pcmp[j].item1_id * this->rank + s] = M->w[s];			// other threads might be doing the same thing
+						V[this->g.pcmp[j].item2_id * this->rank + s] = M->w[s + this->rank];		// so add lock to the two steps is another option.
 					}
-					free_and_destroy_model(&M);
+					//free_and_destroy_model(&M);
 				}
 			}
 		}
