@@ -126,7 +126,6 @@ struct Graph {
 		for (int i = offset; i < m + offset; ++i) {
 			E += nodes[i].degree;
 		}
-		printf("m=%d, 2E=%d\n", m, E);
 		E /= 2;
 	}
 

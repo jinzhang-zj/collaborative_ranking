@@ -56,7 +56,7 @@ Problem::Problem (int r, int np): g(np) {
 }
 
 Problem::~Problem () {
-	printf("calling the destructor\n");
+	//printf("calling the destructor\n");
 	this->de_allocate();
 }
 
@@ -76,7 +76,7 @@ void Problem::read_data (char* train_file, char* test_file) {
 		}
 		this->n_test_comps = this->comparisons_test.size();
 	} else {
-		printf("Error in opening the testing file\n");
+		printf("error in opening the testing file\n");
 		exit(EXIT_FAILURE);
 	}
 	f.close();
@@ -104,6 +104,8 @@ void Problem::alt_rankSVM () {
 		this->V[i] = ((double) rand() / RAND_MAX);
 	}
 
+	printf("initial error %f\n", this->compute_testerror() );
+
 	// Alternating RankSVM
 	struct feature_node **A, **B;
 	A = new struct feature_node*[this->n_train_comps];
@@ -125,9 +127,9 @@ void Problem::alt_rankSVM () {
 	}
 
 
-	for (int iter = 0; iter < 20; ++iter) {
+	for (int iter = 0; iter < 4; ++iter) {
 		// Learning U
-		// #pragma omp parallel for
+		//#pragma omp parallel for
 		for (int i = 0; i < this->n_users; ++i) {
 			for (int j = this->g.uidx[i]; j < this->g.uidx[i + 1]; ++j) {
 				double *V1 = &V[this->g.ucmp[j].item1_id * this->rank];
@@ -166,7 +168,7 @@ void Problem::alt_rankSVM () {
 		}
 
 		// Learning V 
-		// #pragma omp parallel for
+		//#pragma omp parallel for
 		for (int i = 0; i < this->nparts; ++i) {
 			// solve the SVM problem sequentially for each sample in the partition
 			for (int j = this->g.pidx[i]; j < this->g.pidx[i + 1]; ++j) {
@@ -206,6 +208,7 @@ void Problem::alt_rankSVM () {
 				}
 			}
 		}
+		printf("iteratrion %d, test error %f\n", iter, this->compute_testerror() );
 	}
 
 	for (int i = 0; i < this->n_train_comps; ++i) {
@@ -248,16 +251,20 @@ void Problem::de_allocate () {
 }
 
 int main (int argc, char* argv[]) {
-	Problem p(10, 16);		// rank = 10, #partition = 16
-	if (argc < 2) {
+	if (argc < 4) {
 		cout << "Solve collaborative ranking problem with given training/testing data set" << endl;
-		cout << "Usage ./collaborative_ranking  : [training file] [testing file] " << endl;
+		cout << "Usage ./collaborative_ranking  : [training file] [testing file] [num_threads]" << endl;
 		return 0;
 	}
 
+	Problem p(10, 16);		// rank = 10, #partition = 16
 	p.read_data(argv[1], argv[2]);
+	int nr_threads = atoi(argv[3]);
+	omp_set_dynamic(0);
+	omp_set_num_threads(nr_threads);
+	double start = omp_get_wtime();
 	p.alt_rankSVM();
-	double e = p.compute_testerror();
-	printf("error is: %f\n", e);
+	double end = omp_get_wtime() - start;
+	printf("%d threads, takes %f seconds\n", nr_threads, end);
 	return 0;
 }
