@@ -1,5 +1,5 @@
 CC=g++
-CFLAG=-std=c++11 -O3 -g -fopenmp
+CFLAG=-std=c++11 -O3 -g -rdynamic -fopenmp
 metis=/work/01802/mooncake/opt/metis
 parmetis=/work/01802/mooncake/opt/parmetis
 liblinear=/work/01802/mooncake/opt/liblinear-1.94

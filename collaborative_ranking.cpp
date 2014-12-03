@@ -36,9 +36,10 @@ class Problem {
 	Graph g;						// Graph used for clustering training data
 	vector<comparison> comparisons_test;			// vector stores testing comparison data
 
-	void de_allocate();					// check if U, V has been allocated
+	void de_allocate();					// deallocate U, V when they are used multiple times by different methods
 	public:
-		Problem(int, int);					// default constructor
+		Problem(int, int);				// default constructor
+		~Problem();					// default destructor
 	void read_data(char* train_file, char* test_file);	// read function
 	void alt_rankSVM();
 	// two different sgd function
@@ -50,7 +51,13 @@ class Problem {
 Problem::Problem (int r, int np): g(np) {
 	this->rank = r;
 	this->is_allocated = false;
+	this->is_clustered = false;
 	this->nparts = np;
+}
+
+Problem::~Problem () {
+	printf("calling the destructor\n");
+	this->de_allocate();
 }
 
 void Problem::read_data (char* train_file, char* test_file) {
@@ -64,8 +71,8 @@ void Problem::read_data (char* train_file, char* test_file) {
 		int u, i, j;
 		while (f >> u >> i >> j) {
 			this->n_users = max(u, this->n_users);
-			this->n_items = max(i, max(j, this->n_items));
-			this->comparisons_test.push_back(comparison(u - 1, i - 1, j - 1) );
+			this->n_items = max(i + 1, max(j + 1, this->n_items));
+			this->comparisons_test.push_back(comparison(u - 1, i, j) );
 		}
 		this->n_test_comps = this->comparisons_test.size();
 	} else {
@@ -73,27 +80,28 @@ void Problem::read_data (char* train_file, char* test_file) {
 		exit(EXIT_FAILURE);
 	}
 	f.close();
+
+	this->U = new double [this->n_users * this->rank];
+	this->V = new double [this->n_items * this->rank];
 }
 
 void Problem::alt_rankSVM () {
 	if (!is_clustered) {
 		this->g.cluster();		// call graph clustering prior to the computation
+		is_clustered = true;
 	}
 
-	if (this->is_allocated) {
-		this->de_allocate();
-	}
-
-	this->is_allocated = true;
-	this->U = new double [this->n_users * this->rank];
-	this->V = new double [this->n_items * this->rank];
+	//if (this->is_allocated) {
+	//	this->de_allocate();
+	//}
+	//this->is_allocated = true;
 
 	srand(time(NULL));
-	for (int i = 0; i < this->n_users; ++i) {
-		U[i] = ((double) rand() / RAND_MAX);
+	for (int i = 0; i < this->n_users * this->rank; ++i) {
+		this->U[i] = ((double) rand() / RAND_MAX);
 	}
-	for (int i = 0; i < this->n_users; ++i) {
-		V[i] = ((double) rand() / RAND_MAX);
+	for (int i = 0; i < this->n_items * this->rank; ++i) {
+		this->V[i] = ((double) rand() / RAND_MAX);
 	}
 
 	// Alternating RankSVM
@@ -116,7 +124,8 @@ void Problem::alt_rankSVM () {
 		B[i][this->rank * 2].index = -1;
 	}
 
-	for (int iter = 0; iter < 20; ++iter) {
+
+	for (int iter = 0; iter < 1; ++iter) {
 		// Learning U
 		// #pragma omp parallel for
 		for (int i = 0; i < this->n_users; ++i) {
@@ -149,10 +158,11 @@ void Problem::alt_rankSVM () {
 				M = train(&P, &param);
 				// store the result
 				for (int j = 0; j < rank; ++j) {
-					U[i * rank + j] = M->w[j];
+					this->U[i * rank + j] = M->w[j];
 				}
-				//free_and_destory_model(&M);
+				free_and_destroy_model(&M);
 			}
+			delete [] y;
 		}
 
 		// Learning V 
@@ -186,15 +196,26 @@ void Problem::alt_rankSVM () {
 
 					// store the result
 					for (int s = 0; s < rank; ++s) {
-						V[this->g.pcmp[j].item1_id * this->rank + s] = M->w[s];			// other threads might be doing the same thing
-						V[this->g.pcmp[j].item2_id * this->rank + s] = M->w[s + this->rank];		// so add lock to the two steps is another option.
+						int v1 = this->g.pcmp[j].item1_id;
+						int v2 = this->g.pcmp[j].item2_id;
+						//printf("v1 = %d, v2 = %d\n", v1, v2);
+						this->V[this->g.pcmp[j].item1_id * this->rank + s] = M->w[s];			// other threads might be doing the same thing
+						this->V[this->g.pcmp[j].item2_id * this->rank + s] = M->w[s + this->rank];		// so add lock to the two steps is another option.
 					}
-					//free_and_destroy_model(&M);
+					free_and_destroy_model(&M);
 				}
 			}
 		}
 	}
-}
+
+	for (int i = 0; i < this->n_train_comps; ++i) {
+		delete [] A[i];
+		delete [] B[i];
+	}
+	delete [] A;
+	delete [] B;
+
+}	
 
 double Problem::compute_ndcg() {
 	double ndcg_sum = 0.;
@@ -214,7 +235,7 @@ double Problem::compute_testerror() {
 		int item1_idx = comparisons_test[i].item1_id * rank;
 		int item2_idx = comparisons_test[i].item2_id * rank;
 		for(int k=0; k<rank; k++) prod += U[user_idx + k] * (V[item1_idx + k] - V[item2_idx + k]);
-		if (prod < 0.) n_error++;
+		if (prod <= 0.) n_error++;
 	}
 	return (double)n_error / (double)n_test_comps;
 }
@@ -236,5 +257,7 @@ int main (int argc, char* argv[]) {
 
 	p.read_data(argv[1], argv[2]);
 	p.alt_rankSVM();
+	double e = p.compute_testerror();
+	printf("error is: %f\n", e);
 	return 0;
 }
