@@ -194,13 +194,12 @@ void Problem::alt_rankSVM () {
 				struct model *M;
 				if (!check_parameter(&P, &param) ) {
 					// run SVM
-					M = train(&P, &param);
+					//M = train(&P, &param);
 
 					// store the result
 					for (int s = 0; s < rank; ++s) {
 						int v1 = this->g.pcmp[j].item1_id;
 						int v2 = this->g.pcmp[j].item2_id;
-						//printf("v1 = %d, v2 = %d\n", v1, v2);
 						this->V[this->g.pcmp[j].item1_id * this->rank + s] = M->w[s];			// other threads might be doing the same thing
 						this->V[this->g.pcmp[j].item2_id * this->rank + s] = M->w[s + this->rank];		// so add lock to the two steps is another option.
 					}
