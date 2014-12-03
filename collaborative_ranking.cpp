@@ -125,7 +125,7 @@ void Problem::alt_rankSVM () {
 	}
 
 
-	for (int iter = 0; iter < 1; ++iter) {
+	for (int iter = 0; iter < 20; ++iter) {
 		// Learning U
 		// #pragma omp parallel for
 		for (int i = 0; i < this->n_users; ++i) {
