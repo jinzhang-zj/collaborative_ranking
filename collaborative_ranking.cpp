@@ -72,8 +72,8 @@ void Problem::read_data (char* train_file, char* test_file) {
 		int u, i, j;
 		while (f >> u >> i >> j) {
 			this->n_users = max(u, this->n_users);
-			this->n_items = max(i + 1, max(j + 1, this->n_items));
-			this->comparisons_test.push_back(comparison(u - 1, i, j) );
+			this->n_items = max(i, max(j, this->n_items));
+			this->comparisons_test.push_back(comparison(u - 1, i - 1, j - 1) );
 		}
 		this->n_test_comps = this->comparisons_test.size();
 	} else {
@@ -81,21 +81,17 @@ void Problem::read_data (char* train_file, char* test_file) {
 		exit(EXIT_FAILURE);
 	}
 	f.close();
+
 	this->U = new double [this->n_users * this->rank];
 	this->V = new double [this->n_items * this->rank];
-}
 
-void Problem::alt_rankSVM () {
 	if (!is_clustered) {
 		this->g.cluster();		// call graph clustering prior to the computation
 		is_clustered = true;
 	}
+}
 
-	//if (this->is_allocated) {
-	//	this->de_allocate();
-	//}
-	//this->is_allocated = true;
-
+void Problem::alt_rankSVM () {
 	srand(time(NULL));
 	for (int i = 0; i < this->n_users * this->rank; ++i) {
 		this->U[i] = ((double) rand() / RAND_MAX);
@@ -130,9 +126,6 @@ void Problem::alt_rankSVM () {
 		// Learning U
 		#pragma omp parallel for
 		for (int i = 0; i < this->n_users; ++i) {
-			// int start = this->g.uidx[i];
-			// int end = this->g.uidx[i + 1];
-			// random_shuffle(this->g.ucmp.begin() + start, this->g.ucmp.begin() + end);
 			for (int j = this->g.uidx[i]; j < this->g.uidx[i + 1]; ++j) {
 				double *V1 = &V[this->g.ucmp[j].item1_id * this->rank];
 				double *V2 = &V[this->g.ucmp[j].item2_id * this->rank];
@@ -156,11 +149,12 @@ void Problem::alt_rankSVM () {
 			struct parameter param;
 			param.solver_type = L2R_L2LOSS_SVC_DUAL;
 			param.C = 1.;
+			param.eps = 1e-8;
 			//struct model *M;
 			if (!check_parameter(&P, &param) ) {
 				// run SVM
-				vector<double> w = trainU(&P, &param);
 				//M = train(&P, &param);
+				vector<double> w = trainU(&P, &param);
 				// store the result
 				for (int j = 0; j < rank; ++j) {
 					this->U[i * rank + j] = w[j];
@@ -171,12 +165,9 @@ void Problem::alt_rankSVM () {
 		}
 
 		// Learning V 
-		//#pragma omp parallel for
+		#pragma omp parallel for
 		for (int i = 0; i < this->nparts; ++i) {
 			// solve the SVM problem sequentially for each sample in the partition
-			//int start = this->g.pidx[i];
-			//int end = this->g.pidx[i + 1];
-			//random_shuffle(this->g.pcmp.begin() + start, this->g.pcmp.begin() + end);
 			for (int j = this->g.pidx[i]; j < this->g.pidx[i + 1]; ++j) {
 				// generate the training set for V using U
 				for (int s = 0; s < this->rank; ++s) {
@@ -196,7 +187,7 @@ void Problem::alt_rankSVM () {
 				struct parameter param;
 				param.solver_type = L2R_L2LOSS_SVC_DUAL;
 				param.C = 1.;
-
+				param.eps = 1e-8;
 				//struct model *M;
 				if (!check_parameter(&P, &param) ) {
 					// run SVM
@@ -223,7 +214,6 @@ void Problem::alt_rankSVM () {
 	}
 	delete [] A;
 	delete [] B;
-
 }	
 
 double Problem::compute_ndcg() {
@@ -244,7 +234,7 @@ double Problem::compute_testerror() {
 		int item1_idx = comparisons_test[i].item1_id * rank;
 		int item2_idx = comparisons_test[i].item2_id * rank;
 		for(int k=0; k<rank; k++) prod += U[user_idx + k] * (V[item1_idx + k] - V[item2_idx + k]);
-		if (prod <= 0.) n_error++;
+		if (prod < 0.) n_error++;
 	}
 	return (double)n_error / (double)n_test_comps;
 }
@@ -264,7 +254,8 @@ int main (int argc, char* argv[]) {
 	}
 
 	int nr_threads = atoi(argv[3]);
-	Problem p(10, nr_threads);		// rank = 10, #partition = 16
+	//int nparts = (nr_threads > 1) ? nr_threads : 2;
+	Problem p(10, nr_threads + 1);		// rank = 10, #partition = 16
 	p.read_data(argv[1], argv[2]);
 	omp_set_dynamic(0);
 	omp_set_num_threads(nr_threads);

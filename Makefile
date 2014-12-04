@@ -1,5 +1,5 @@
 CC=g++
-CFLAG=-std=c++11 -O3 -g -rdynamic -fopenmp
+CFLAG=-std=c++11 -O3 -g -fopenmp
 metis=/work/01802/mooncake/opt/metis
 parmetis=/work/01802/mooncake/opt/parmetis
 liblinear=/work/01802/mooncake/opt/liblinear-1.94
@@ -14,4 +14,4 @@ col:
 run:
 	./a.out
 clean:
-	rm *.o[0-9]* *.e[0-9]* 
+	rm *.o[0-9]* *.e[0-9]* collaborative_ranking.o a.out
