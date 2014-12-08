@@ -13,11 +13,10 @@ using dual coordinate descent with the equation listed in the report
 #include <algorithm>	// random shuffle
 #include <stdlib.h>	// max
 
-// learning U, return w vector
-vector<double> trainU2(problem* p, parameter* param) {
+// learning U, with global w and alpha vector
+// w is the U[iusr ... iusr+rank]
+void trainU2(problem* p, parameter* param, double* U, int iusr, double* alpha) {
 	vector<int> order(p->l);
-	vector<double> alpha(p->l, 0);
-	vector<double> w(p->n, 0);
 	double one_2C = 0.5 / param->C;
 	double maxiter = 1000;
 	double eps = param->eps;
@@ -40,7 +39,7 @@ vector<double> trainU2(problem* p, parameter* param) {
 
 			double ywxi = 0;
 			for (int j = 0; j < p->n; ++j) {
-				ywxi += xi[j].value * w[xi[j].index - 1];
+				ywxi += xi[j].value * U[iusr * p->n + j];
 			}
 			ywxi *= p->y[idx];
 
@@ -49,7 +48,8 @@ vector<double> trainU2(problem* p, parameter* param) {
 			alpha[idx] += delta;
 			
 			for (int j = 0; j < p->n; ++j) {
-				w[xi[j].index - 1] += delta * p->y[idx] * xi[j].value;
+				double dval = delta * xi[j].value;
+				U[idx * p->n + j] += dval;
 			}
 		}
 		
@@ -58,7 +58,7 @@ vector<double> trainU2(problem* p, parameter* param) {
 		double alpha_sum = 0;
 		double Q = 0;
 		for (int j = 0; j < p->n; ++j) {
-			w_snorm += w[j] * w[j];
+			w_snorm += U[iusr * p->n + j] * U[iusr * p->n + j];
 		}
 		for (int j = 0; j < p->l; ++j) {
 			alpha_snorm += alpha[j] * alpha[j];	
@@ -70,14 +70,13 @@ vector<double> trainU2(problem* p, parameter* param) {
 		}
 		oldQ = Q;
 	}
-	return w;
 }
 
-// learning V, return w vector
-// the input is only one sample, or p->n = 1
+// learning V with global w and alpha vector 
+// w is V[iid1 .. iid1+rank], -V[iid2 .. iid2+rank]
 void trainV2(problem* p, parameter* param, double* V, comparison& c, double& alpha ) {
 	double one_2C = 0.5 / param->C;
-	double maxiter = 1;
+	double maxiter = 1000;
 	double eps = param->eps;
 	double oldQ = 0;  
 	feature_node* xi = p->x[0];
@@ -101,6 +100,10 @@ void trainV2(problem* p, parameter* param, double* V, comparison& c, double& alp
 		}
 
 		double delta = (1 - ywxi - alpha * one_2C) / (xi_snorm * 2 + one_2C);		// xi_snorm * 2, this is the only difference
+
+		if (fabs(delta) < eps || alpha == 0 && delta < 0) {
+			break;
+		}
 		
 		delta = max(0., delta + alpha) - alpha;
 		alpha += delta;

@@ -24,6 +24,7 @@
 #include <fstream>
 #include "linear.h"
 #include "collaborative_ranking.h"
+#include "cdSVM.h"
 
 using namespace std;
 
@@ -117,8 +118,9 @@ void Problem::alt_rankSVM () {
 	}
 
 	double *alphaV = new double[this->n_train_comps];
+	double *alphaU = new double[this->n_train_comps];
 	memset(alphaV, 0, sizeof(double) * this->n_train_comps);
-
+	memset(alphaU, 0, sizeof(double) * this->n_train_comps);
 
 	printf("initial error %f\n", this->compute_testerror() );
 
@@ -174,11 +176,12 @@ void Problem::alt_rankSVM () {
 			param.eps = eps;
 			if (!check_parameter(&P, &param) ) {
 				// run SVM
-				vector<double> w = trainU(&P, &param);
+				//vector<double> w = trainU(&P, &param);
+				trainU2(&P, &param, U, i, &alphaU[this->g.uidx[i] ]);
 				// store the result
-				for (int j = 0; j < rank; ++j) {
-					this->U[i * rank + j] = w[j];
-				}
+				//for (int j = 0; j < rank; ++j) {
+				//	this->U[i * rank + j] = w[j];
+				//}
 			}
 			delete [] y;
 		}
@@ -242,6 +245,7 @@ void Problem::alt_rankSVM () {
 	delete [] A;
 	delete [] B;
 	delete [] alphaV;
+	delete [] alphaU;
 }	
 
 bool Problem::sgd_step(const int& idx, const double step_size) {

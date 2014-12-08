@@ -355,49 +355,4 @@ vector<double> trainV(problem* p, parameter* param) {
 	return w;
 }
 
-// learning V, using global vector w and alpha
-// the input is only one sample, or p->n = 1
-void trainV2(problem* p, parameter* param, double* V, comparison& c, double& alpha ) {
-	double one_2C = 0.5 / param->C;
-	double maxiter = 1;
-	double eps = param->eps;
-	double oldQ = 0;  
-	feature_node* xi = p->x[0];
-
-	int uid = c.user_id;
-	int iid1 = c.item1_id;
-	int iid2 = c.item2_id;
-	int rank = p->n / 2;
-
-	for (int iter = 0; iter < maxiter; ++iter) {
-		double xi_snorm = 0;
-		for (int j = 0; j < rank; ++j) {
-			xi_snorm += xi[j].value * xi[j].value;
-		}
-		xi_snorm *= 2;
-
-		double ywxi = 0;
-		for (int j = 0; j < rank; ++j) {
-			ywxi += xi[j].value * V[iid1 * rank + j];
-			ywxi += xi[j + rank].value * V[iid2 * rank + j];
-		}
-
-		double delta = (1 - ywxi - alpha * one_2C) / (xi_snorm * 2 + one_2C);		// xi_snorm * 2, this is the only difference
-	
-		// stoping rules	
-		if (fabs(delta) < eps || alpha == 0 && delta < 0) {
-			break;
-		}
-
-		delta = max(0., delta + alpha) - alpha;
-		alpha += delta;
-		for (int j = 0; j < rank; ++j) {
-			double dval = delta * xi[j].value;
-			//#pragma omp atomic
-			V[iid1 * rank + j] += dval;
-			//#pragma omp atomic
-			V[iid2 * rank + j] -= dval;
-		}
-	}
-}
 #endif
