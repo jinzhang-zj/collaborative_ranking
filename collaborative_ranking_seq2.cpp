@@ -24,7 +24,6 @@
 #include <fstream>
 #include "linear.h"
 #include "collaborative_ranking.h"
-#include "cdSVM.h"
 
 using namespace std;
 

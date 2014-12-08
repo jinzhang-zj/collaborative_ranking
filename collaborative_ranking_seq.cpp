@@ -19,7 +19,6 @@
 #include <fstream>
 #include "linear.h"
 #include "collaborative_ranking.h"
-#include "cdSVM.h"
 
 using namespace std;
 
@@ -141,16 +140,16 @@ void Problem::alt_rankSVM () {
 			param.solver_type = L2R_L2LOSS_SVC_DUAL;
 			param.C = 1.;
 			param.eps = 1e-8;
-			struct model *M;
+			//struct model *M;
 			if (!check_parameter(&P, &param) ) {
 				// run SVM
-				M = train(&P, &param);
-				//vector<double> w = trainU(&P, &param);
+				// M = train(&P, &param);
+				vector<double> w = trainU(&P, &param);
 				// store the result
 				for (int j = 0; j < rank; ++j) {
-					this->U[i * rank + j] = M->w[j];
+					this->U[i * rank + j] = w[j];
 				}
-				free_and_destroy_model(&M);
+				//free_and_destroy_model(&M);
 			}
 			delete [] y;
 		}

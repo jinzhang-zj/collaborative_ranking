@@ -24,7 +24,6 @@
 #include <fstream>
 #include "linear.h"
 #include "collaborative_ranking.h"
-#include "cdSVM.h"		// user-defined SVM train function
 
 using namespace std;
 
