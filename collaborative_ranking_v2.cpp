@@ -143,8 +143,9 @@ void Problem::alt_rankSVM () {
 		B[i][this->rank * 2].index = -1;
 	}
 
-	for (int iter = 0; iter < 20; ++iter) {
+	for (int OuterIter = 0; OuterIter < 20; ++OuterIter) {
 		// Learning U
+		double start = omp_get_wtime();
 		#pragma omp parallel for
 		for (int i = 0; i < this->n_users; ++i) {
 			for (int j = this->g.uidx[i]; j < this->g.uidx[i + 1]; ++j) {
@@ -171,23 +172,20 @@ void Problem::alt_rankSVM () {
 			param.solver_type = L2R_L2LOSS_SVC_DUAL;
 			param.C = 1.;
 			param.eps = eps;
-			//struct model *M;
 			if (!check_parameter(&P, &param) ) {
 				// run SVM
-				//M = train(&P, &param);
 				vector<double> w = trainU(&P, &param);
 				// store the result
 				for (int j = 0; j < rank; ++j) {
 					this->U[i * rank + j] = w[j];
 				}
-				//free_and_destroy_model(&M);
 			}
 			delete [] y;
 		}
-
+		double Utime = omp_get_wtime() - start;
 		// Learning V 
 		double oldQ = 0;
-		for (int innerIter = 0; innerIter < 10; ++innerIter) {
+		for (int InnerIter = 0; InnerIter < 1; ++InnerIter) {
 			#pragma omp parallel for
 			for (int i = 0; i < this->nparts; ++i) {
 				// solve the SVM problem sequentially for each sample in the partition
@@ -210,7 +208,7 @@ void Problem::alt_rankSVM () {
 					struct parameter param;
 					param.solver_type = L2R_L2LOSS_SVC_DUAL;
 					param.C = 1.;
-					param.eps = 1e-8;
+					param.eps = eps;
 					if (!check_parameter(&P, &param) ) {
 						// run SVM
 						trainV2(&P, &param, V, this->g.pcmp[j], alphaV[j]);
@@ -218,22 +216,23 @@ void Problem::alt_rankSVM () {
 				}
 			}
 			
-			double w_snorm = 0;
-			double alpha_snorm = 0;
-			double alpha_sum = 0;
-			for (int i = 0; i < this->n_items * this->rank; ++i) {
-				w_snorm += V[i] * V[i];
-			}
-			for (int i = 0; i < this->n_train_comps; ++i) {
-				alpha_snorm += alphaV[i] * alphaV[i];
-				alpha_sum += alphaV[i];
-			}
-			double Q = w_snorm / 2 + alpha_snorm / 4 - alpha_sum;
-			if (fabs(Q - oldQ) < eps) {
-				break;
-			}
+			//double w_snorm = 0;
+			//double alpha_snorm = 0;
+			//double alpha_sum = 0;
+			//for (int i = 0; i < this->n_items * this->rank; ++i) {
+			//	w_snorm += V[i] * V[i];
+			//}
+			//for (int i = 0; i < this->n_train_comps; ++i) {
+			//	alpha_snorm += alphaV[i] * alphaV[i];
+			//	alpha_sum += alphaV[i];
+			//}
+			//double Q = w_snorm / 2 + alpha_snorm / 4 - alpha_sum;
+			//if (fabs(Q - oldQ) < eps) {
+			//	break;
+			//}
 		}
-		printf("iteratrion %d, test error %f\n", iter, this->compute_testerror() );
+		double Vtime = omp_get_wtime() - Utime - start;
+		printf("iteratrion %d, test error %f, learning U takes %f seconds, learning V takes %f seconds\n", OuterIter, this->compute_testerror(), Utime, Vtime);
 	}
 
 	for (int i = 0; i < this->n_train_comps; ++i) {

@@ -383,7 +383,12 @@ void trainV2(problem* p, parameter* param, double* V, comparison& c, double& alp
 		}
 
 		double delta = (1 - ywxi - alpha * one_2C) / (xi_snorm * 2 + one_2C);		// xi_snorm * 2, this is the only difference
-		
+	
+		// stoping rules	
+		if (fabs(delta) < eps || alpha == 0 && delta < 0) {
+			break;
+		}
+
 		delta = max(0., delta + alpha) - alpha;
 		alpha += delta;
 		for (int j = 0; j < rank; ++j) {
@@ -393,7 +398,6 @@ void trainV2(problem* p, parameter* param, double* V, comparison& c, double& alp
 			//#pragma omp atomic
 			V[iid2 * rank + j] -= dval;
 		}
-
 	}
 }
 #endif
