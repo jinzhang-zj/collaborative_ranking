@@ -16,20 +16,20 @@ using dual coordinate descent with the equation listed in the report
 // learning U, with global w and alpha vector
 // w is the U[iusr ... iusr+rank]
 void trainU2(problem* p, parameter* param, double* U, int iusr, double* alpha) {
-	vector<int> order(p->l);
+	//vector<int> order(p->l);
 	double one_2C = 0.5 / param->C;
-	double maxiter = 1000;
+	double maxiter = 10;
 	double eps = param->eps;
 	double oldQ = 0;
 
-	for (int i = 0; i < p->l; ++i) {
-		order[i] = i;
-	}
+	//for (int i = 0; i < p->l; ++i) {
+	//	order[i] = i;
+	//}
 
 	for (int iter = 0; iter < maxiter; ++iter) {
-		random_shuffle(order.begin(), order.end() );
+		//random_shuffle(order.begin(), order.end() );
 		for (int i = 0; i < p->l; ++i) {
-			int idx = order[i];
+			int idx = i;
 			feature_node* xi = p->x[idx];
 
 			double xi_snorm = 0;

@@ -219,20 +219,6 @@ void Problem::alt_rankSVM () {
 				}
 			}
 			
-			//double w_snorm = 0;
-			//double alpha_snorm = 0;
-			//double alpha_sum = 0;
-			//for (int i = 0; i < this->n_items * this->rank; ++i) {
-			//	w_snorm += V[i] * V[i];
-			//}
-			//for (int i = 0; i < this->n_train_comps; ++i) {
-			//	alpha_snorm += alphaV[i] * alphaV[i];
-			//	alpha_sum += alphaV[i];
-			//}
-			//double Q = w_snorm / 2 + alpha_snorm / 4 - alpha_sum;
-			//if (fabs(Q - oldQ) < eps) {
-			//	break;
-			//}
 		}
 		double Vtime = omp_get_wtime() - Utime - start;
 		printf("iteratrion %d, test error %f, learning U takes %f seconds, learning V takes %f seconds\n", OuterIter, this->compute_testerror(), Utime, Vtime);
