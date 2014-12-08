@@ -14,7 +14,7 @@ using dual coordinate descent with the equation listed in the report
 #include <stdlib.h>	// max
 
 // learning U, return w vector
-vector<double> trainU(problem* p, parameter* param) {
+vector<double> trainU2(problem* p, parameter* param) {
 	vector<int> order(p->l);
 	vector<double> alpha(p->l, 0);
 	vector<double> w(p->n, 0);
@@ -75,45 +75,42 @@ vector<double> trainU(problem* p, parameter* param) {
 
 // learning V, return w vector
 // the input is only one sample, or p->n = 1
-vector<double> trainV(problem* p, parameter* param) {
-	double alpha = 0;
+void trainV2(problem* p, parameter* param, double* V, comparison& c, double& alpha ) {
 	double one_2C = 0.5 / param->C;
-	double maxiter = 1000;
+	double maxiter = 1;
 	double eps = param->eps;
 	double oldQ = 0;  
-	vector<double> w(p->n);
 	feature_node* xi = p->x[0];
+
+	int uid = c.user_id;
+	int iid1 = c.item1_id;
+	int iid2 = c.item2_id;
+	int rank = p->n / 2;
 
 	for (int iter = 0; iter < maxiter; ++iter) {
 		double xi_snorm = 0;
-		for (int j = 0; j < p->n; ++j) {
+		for (int j = 0; j < rank; ++j) {
 			xi_snorm += xi[j].value * xi[j].value;
 		}
+		xi_snorm *= 2;
 
 		double ywxi = 0;
-		for (int j = 0; j < p->n; ++j) {
-			ywxi += xi[j].value * w[xi[j].index - 1];
+		for (int j = 0; j < rank; ++j) {
+			ywxi += xi[j].value * V[iid1 * rank + j];
+			ywxi += xi[j + rank].value * V[iid2 * rank + j];
 		}
 
 		double delta = (1 - ywxi - alpha * one_2C) / (xi_snorm * 2 + one_2C);		// xi_snorm * 2, this is the only difference
+		
 		delta = max(0., delta + alpha) - alpha;
 		alpha += delta;
-
-		for (int j = 0; j < p->n; ++j) {
-			w[xi[j].index - 1] += delta * p->y[0] * xi[j].value;
+		for (int j = 0; j < rank; ++j) {
+			double dval = delta * xi[j].value;
+			//#pragma omp atomic
+			V[iid1 * rank + j] += dval;
+			//#pragma omp atomic
+			V[iid2 * rank + j] -= dval;
 		}
 
-		// calculating the objective function value
-		double Q = 0;
-		for (int j = 0; j < p->n; ++j) {
-			Q += w[j] * w[j];
-		}
-		Q = Q / 2 + alpha * alpha * one_2C / 2 - alpha;
-		
-		if (fabs(Q - oldQ) < eps) {
-			break;
-		}
-		oldQ = Q;
 	}
-	return w;
 }

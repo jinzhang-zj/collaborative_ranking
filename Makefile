@@ -4,6 +4,9 @@ metis=/work/01802/mooncake/opt/metis
 parmetis=/work/01802/mooncake/opt/parmetis
 liblinear=/work/01802/mooncake/opt/liblinear-1.94
 
+tt:
+	$(CC) $(CFLAG) -I$(liblinear) -c collaborative_ranking_v2.cpp 
+	$(CC) $(CFLAG) -o testcol collaborative_ranking_v2.o $(liblinear)/linear.o $(liblinear)/tron.o $(liblinear)/blas/*.o
 all:
 	$(CC) $(CFLAG) -I$(liblinear) -c collaborative_ranking_seq.cpp 
 	$(CC) $(CFLAG) -o seqcol collaborative_ranking_seq.o $(liblinear)/linear.o $(liblinear)/tron.o $(liblinear)/blas/*.o
