@@ -339,7 +339,7 @@ double Problem::compute_testerror() {
 		int item1_idx = comparisons_test[i].item1_id * rank;
 		int item2_idx = comparisons_test[i].item2_id * rank;
 		for(int k=0; k<rank; k++) prod += U[user_idx + k] * (V[item1_idx + k] - V[item2_idx + k]);
-		if (prod < 0.) n_error++;
+		if (prod <= 0.) n_error++;
 	}
 	return (double)n_error / (double)n_test_comps;
 }
