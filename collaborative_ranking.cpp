@@ -107,9 +107,16 @@ void Problem::read_data (char* train_file, char* test_file) {
 }	
 
 void Problem::alt_rankSVM () {
-	if (!is_clustered) {
-		this->g.cluster();		// call graph clustering prior to the computation
-		is_clustered = true;
+	if (this->nparts != 1) {
+		if (!is_clustered) {
+			this->g.cluster();		// call graph clustering prior to the computation
+			is_clustered = true;
+		}
+	} else {
+		this->g.pcmp = this->g.ucmp;
+		this->g.pidx.resize(2);
+		this->g.pidx[0] = 0;
+		this->g.pidx[1] = this->n_train_comps;
 	}
 
 	double eps = 1e-8;
@@ -385,8 +392,8 @@ int main (int argc, char* argv[]) {
 	}
 
 	int nr_threads = atoi(argv[3]);
-	//int nparts = (nr_threads > 1) ? nr_threads : 2;
-	Problem p(10, nr_threads + 1);		// rank = 10, #partition = 16
+	int nparts = (nr_threads > 1) ? nr_threads + 1 : nr_threads;	// if it's one thread, there is not need to run graclus
+	Problem p(10, nparts);		// rank = 10
 	p.read_data(argv[1], argv[2]);
 	omp_set_dynamic(0);
 	omp_set_num_threads(nr_threads);

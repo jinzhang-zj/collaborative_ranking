@@ -134,7 +134,7 @@ struct Graph {
 		// write the adjacent file
 		int offset = 1;
 		char gfile[50];
-        strcpy(gfile, tf);
+		strcpy(gfile, tf);
 		strcat(gfile,".g");
 		ofstream f(gfile);
 		f << m << ' ' << E << " 1" <<endl;
@@ -211,6 +211,7 @@ struct Graph {
 		}
 
 		// 1D indices for alt-SVM
+		pidx.clear();
 		pidx.resize(nparts + 1);
 		pidx[0] = 0;
 		for (int i = 1; i <= nparts; ++i) {
@@ -231,6 +232,7 @@ struct Graph {
 			}
 		}
 
+		pcmp.clear();
 		pcmp.resize(pidx[nparts]);
 		for (int i = 0; i < nparts; ++i) {
 			for (int j = 0; j < tmp[i].size(); ++j) {
