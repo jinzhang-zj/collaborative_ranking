@@ -6,9 +6,7 @@ collaborative_ranking.h:	header file for running collaborative ranking
 
 collaborative_ranking.cpp:	running collaborative ranking with alternative ranking SVM or Stochastic Gradient Descent (parallel version)
 
-collaborative_ranking_v2.cpp:	running collaborative ranking with alternative ranking SVM with global w and alpha for leanring V
+collaborative_ranking_seq.cpp:	running collaborative ranking with alternative ranking SVM (sequential version), matrix V are trained with all data once using liblinear
 
-collaborative_ranking_seq.cpp:	running collaborative ranking with alternative ranking SVM (sequential version), matrix V are trained with all data once
-
-collaborative_ranking_seq2.cpp:	running collaborative ranking with alternative ranking SVM (sequential version), matrix V are trained with individual samples consecutively
+collaborative_ranking_seq2.cpp:	running collaborative ranking with alternative ranking SVM (sequential version), matrix V are trained with individual samples consecutively using liblinear
 
