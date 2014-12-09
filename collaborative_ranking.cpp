@@ -156,6 +156,8 @@ void Problem::alt_rankSVM () {
 		B[i][this->rank * 2].index = -1;
 	}
 
+    printf("Initial test error : %f \n", this->compute_testerror());
+
 	for (int OuterIter = 0; OuterIter < 20; ++OuterIter) {
 		// Learning U
 		double start = omp_get_wtime();
@@ -243,6 +245,7 @@ bool Problem::sgd_step(const comparison& comp, const double l, const double step
 	double err = 1.;
 	for(int k=0; k<rank; k++) err -= user_vec[k] * (item1_vec[k] - item2_vec[k]);
 
+    /*
     if (err != err) 
     {
         printf("%d %d %d \n", comp.user_id, comp.item1_id, comp.item2_id);
@@ -250,6 +253,7 @@ bool Problem::sgd_step(const comparison& comp, const double l, const double step
             printf("%f %f %f \n", user_vec[k], item1_vec[k], item2_vec[k]);
         printf("\n");
     }
+    */
 
 	if (err > 0) {	
 		double grad = -2. * err;		// gradient direction for l2 hinge loss
@@ -259,10 +263,11 @@ bool Problem::sgd_step(const comparison& comp, const double l, const double step
 			double item1_dir = (grad * user_vec[k] + l / (double)n_comps_item1 * item1_vec[k]);
 			double item2_dir = (-grad * user_vec[k] + l / (double)n_comps_item2 * item2_vec[k]);
 
+            /*
             if ((user_dir != user_dir) || (item1_dir != item1_dir) || (item2_dir != item2_dir))
                 printf("%f %f %f %f %f %d %d %d \n", grad, user_vec[k], item1_vec[k], item2_vec[k], l,
                                          n_comps_user, n_comps_item1, n_comps_item2);
-
+            */
 
 
             // #pragma omp atomic
@@ -287,14 +292,16 @@ void Problem::run_sgd_random() {
 	for(int i=0; i<n_users*rank; i++) U[i] = real_rand();
 	for(int i=0; i<n_items*rank; i++) V[i] = real_rand();
 
-    alpha = 1.;
-    beta  = 1.;
+    alpha = .1;
+    beta  = .1;
     lambda = 1.;
 
-    int n_threads = g.nparts-1;
+    int n_threads = g.nparts;
     int n_iter = n_train_comps*10/n_threads;
 
-    for(int icycle=0; icycle<20; ++icycle) {
+    printf("Initial test error : %f \n", this->compute_testerror());
+ 
+    for(int icycle=0; icycle<100; ++icycle) {
  
         #pragma omp parallel
         {
@@ -302,8 +309,9 @@ void Problem::run_sgd_random() {
         std::mt19937 gen(omp_get_thread_num());
         std::uniform_int_distribution<int> randidx(0, n_train_comps-1);
 
-        for(int iter=1; iter<n_iter; iter++) 
+        for(int iter=1; iter<n_iter; iter++) { 
             sgd_step(g.ucmp[randidx(gen)], lambda, alpha / (1. + beta * (double)iter) / (double)n_threads);
+        }
 
         }
 
@@ -321,7 +329,7 @@ void Problem::run_sgd_random() {
         for(int k=0; k<rank; k++) printf("%5.2f ", V[k]); printf("\n");
         */
       
-        printf("%d iterations, %f test error\n", icycle * n_iter * n_threads, this->compute_testerror());
+        printf("%d iterations, %f test error\n", (icycle+1) * n_iter * n_threads, this->compute_testerror());
     
     }
 }
@@ -401,8 +409,8 @@ int main (int argc, char* argv[]) {
 	p.alt_rankSVM();
 	double m1 = omp_get_wtime() - start;
 	printf("%d threads, rankSVM takes %f seconds\n", nr_threads, m1);
-	//p. run_sgd_random();
-	//double m2 = omp_get_wtime() - start - m1;
-	//printf("%d threads, randSGD takes %f seconds\n", nr_threads, m2);
+	p.run_sgd_random();
+	double m2 = omp_get_wtime() - start - m1;
+	printf("%d threads, randSGD takes %f seconds\n", nr_threads, m2);
 	return 0;
 }
