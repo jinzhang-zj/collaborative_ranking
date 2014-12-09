@@ -65,7 +65,7 @@ Problem::~Problem () {
 }
 
 void Problem::read_data (char* train_file, char* test_file) {
-	this->g.read_data(train_file);	// training file will be feed to graph for clustering
+	this->g.read_data(train_file);	// training file will be fed to graph for clustering
 	this->n_users = this->g.n;
 	this->n_items = this->g.m;
 	this->n_train_comps = this->g.omega;
@@ -152,11 +152,11 @@ void Problem::alt_rankSVM () {
 			struct problem P;
 			P.l = this->g.uidx[i + 1] - this->g.uidx[i];
 			P.n = this->rank;
-			double *y = new double[P.l];
-			for (int j = 0; j < P.l; ++j) {
+			double *y = new double[p.l];
+			for (int j = 0; j < p.l; ++j) {
 				y[j] = 1.;
 			}
-			P.y = y;
+			p.y = y;
 			P.x = &A[this->g.uidx[i]];
 			P.bias = -1.;
 

@@ -109,7 +109,6 @@ void Problem::read_data (char* train_file, char* test_file) {
 }	
 
 void Problem::alt_rankSVM () {
-
 	if (!is_clustered) {
 		this->g.cluster();		// call graph clustering prior to the computation
 		is_clustered = true;
@@ -169,11 +168,6 @@ void Problem::alt_rankSVM () {
 			struct problem P;
 			P.l = this->g.uidx[i + 1] - this->g.uidx[i];
 			P.n = this->rank;
-			double *y = new double[P.l];
-			for (int j = 0; j < P.l; ++j) {
-				y[j] = 1.;
-			}
-			P.y = y;
 			P.x = &A[this->g.uidx[i]];
 			P.bias = -1.;
 
@@ -183,49 +177,37 @@ void Problem::alt_rankSVM () {
 			param.eps = eps;
 			if (!check_parameter(&P, &param) ) {
 				// run SVM
-				//vector<double> w = trainU(&P, &param);
 				trainU2(&P, &param, U, i, &alphaU[this->g.uidx[i] ]);
-				// store the result
-				//for (int j = 0; j < rank; ++j) {
-				//	this->U[i * rank + j] = w[j];
-				//}
 			}
-			delete [] y;
 		}
 		double Utime = omp_get_wtime() - start;
 		// Learning V 
-		double oldQ = 0;
-		for (int InnerIter = 0; InnerIter < 1; ++InnerIter) {
-			#pragma omp parallel for
-			for (int i = 0; i < this->nparts; ++i) {
-				// solve the SVM problem sequentially for each sample in the partition
-				for (int j = this->g.pidx[i]; j < this->g.pidx[i + 1]; ++j) {
-					// generate the training set for V using U
-					for (int s = 0; s < this->rank; ++s) {
-						B[j][s].value = U[this->g.pcmp[j].user_id * this->rank + s];		// U_i
-						B[j][s + rank].value = -U[this->g.pcmp[j].user_id * this->rank + s];	// -U_i
-					}		
-				
-					// call LIBLINEAR with U[i*rank], B[j]
-					struct problem P;
-					P.l = 1;
-					P.n = rank * 2;
-					double y = 1.;
-					P.y = &y;
-					P.x = &B[j];
-					P.bias = -1;
+		#pragma omp parallel for
+		for (int i = 0; i < this->nparts; ++i) {
+			// solve the SVM problem sequentially for each sample in the partition
+			for (int j = this->g.pidx[i]; j < this->g.pidx[i + 1]; ++j) {
+				// generate the training set for V using U
+				for (int s = 0; s < this->rank; ++s) {
+					B[j][s].value = U[this->g.pcmp[j].user_id * this->rank + s];		// U_i
+					B[j][s + rank].value = -U[this->g.pcmp[j].user_id * this->rank + s];	// -U_i
+				}		
+			
+				// call LIBLINEAR with U[i*rank], B[j]
+				struct problem P;
+				P.l = 1;
+				P.n = rank * 2;
+				P.x = &B[j];
+				P.bias = -1;
 
-					struct parameter param;
-					param.solver_type = L2R_L2LOSS_SVC_DUAL;
-					param.C = 1.;
-					param.eps = eps;
-					if (!check_parameter(&P, &param) ) {
-						// run SVM
-						trainV2(&P, &param, V, this->g.pcmp[j], alphaV[j]);
-					}
+				struct parameter param;
+				param.solver_type = L2R_L2LOSS_SVC_DUAL;
+				param.C = 1.;
+				param.eps = eps;
+				if (!check_parameter(&P, &param) ) {
+					// run SVM
+					trainV2(&P, &param, V, this->g.pcmp[j], &alphaV[j]);
 				}
 			}
-			
 		}
 		double Vtime = omp_get_wtime() - Utime - start;
 		printf("iteratrion %d, test error %f, learning U takes %f seconds, learning V takes %f seconds\n", OuterIter, this->compute_testerror(), Utime, Vtime);
@@ -414,8 +396,8 @@ int main (int argc, char* argv[]) {
 	p.alt_rankSVM();
 	double m1 = omp_get_wtime() - start;
 	printf("%d threads, rankSVM takes %f seconds\n", nr_threads, m1);
-	p. run_sgd_random();
-	double m2 = omp_get_wtime() - start - m1;
-	printf("%d threads, randSGD takes %f seconds\n", nr_threads, m2);
+	//p. run_sgd_random();
+	//double m2 = omp_get_wtime() - start - m1;
+	//printf("%d threads, randSGD takes %f seconds\n", nr_threads, m2);
 	return 0;
 }

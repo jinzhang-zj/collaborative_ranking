@@ -104,6 +104,7 @@ struct Graph {
 			int u = ucmp[i].user_id;
 			++uidx[u + 1];
 		}
+	
 		for (int i = 1; i <= n; ++i) {
 			uidx[i] += uidx[i - 1];
 		}
