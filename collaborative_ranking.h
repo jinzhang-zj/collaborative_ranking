@@ -133,8 +133,8 @@ struct Graph {
 	void cluster() {
 		// write the adjacent file
 		int offset = 1;
-		char gfile[20];
-		strcpy(gfile, tf);
+		char gfile[50];
+        strcpy(gfile, tf);
 		strcat(gfile,".g");
 		ofstream f(gfile);
 		f << m << ' ' << E << " 1" <<endl;
@@ -145,7 +145,14 @@ struct Graph {
 			f << endl;
 		}
 		f.close();
-		
+	
+        char *filename;
+        filename = strrchr(gfile,'/');
+        if (filename == nullptr) 
+            filename = gfile;
+        else
+            filename += 1;
+	
 		// call gcluster
 		char c_nparts[2];
 		sprintf(c_nparts, "%d", nparts);
@@ -164,8 +171,8 @@ struct Graph {
 		}
 
 		// read partition
-		char partition[20];
-		strcpy(partition, gfile);
+		char partition[50];
+		strcpy(partition, filename);
 		strcat(partition, ".part.");
 		strcat(partition, c_nparts);
 		printf("partition file: [%s]\n", partition);
