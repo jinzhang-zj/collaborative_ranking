@@ -26,7 +26,6 @@
 #include <fstream>
 #include "linear.h"
 #include "collaborative_ranking.h"
-#include "cdSVM.h"
 
 using namespace std;
 
@@ -177,7 +176,7 @@ void Problem::alt_rankSVM () {
 			param.eps = eps;
 			if (!check_parameter(&P, &param) ) {
 				// run SVM
-				trainU2(&P, &param, U, i, &alphaU[this->g.uidx[i] ]);
+				trainU(&P, &param, U, i, &alphaU[this->g.uidx[i] ]);
 			}
 		}
 		double Utime = omp_get_wtime() - start;
@@ -205,7 +204,7 @@ void Problem::alt_rankSVM () {
 				param.eps = eps;
 				if (!check_parameter(&P, &param) ) {
 					// run SVM
-					trainV2(&P, &param, V, this->g.pcmp[j], &alphaV[j]);
+					trainV(&P, &param, V, this->g.pcmp[j], &alphaV[j]);
 				}
 			}
 		}
