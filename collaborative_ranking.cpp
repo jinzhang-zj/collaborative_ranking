@@ -259,9 +259,9 @@ bool Problem::sgd_step(const comparison& comp, const double l, const double step
 		double grad = -2. * err;		// gradient direction for l2 hinge loss
 
 		for(int k=0; k<rank; k++) {
-			double user_dir  = (grad * (item1_vec[k] - item2_vec[k]) + l / (double)n_comps_user * user_vec[k]);
-			double item1_dir = (grad * user_vec[k] + l / (double)n_comps_item1 * item1_vec[k]);
-			double item2_dir = (-grad * user_vec[k] + l / (double)n_comps_item2 * item2_vec[k]);
+			double user_dir  = step_size * (grad * (item1_vec[k] - item2_vec[k]) + l / (double)n_comps_user * user_vec[k]);
+			double item1_dir = step_size * (grad * user_vec[k] + l / (double)n_comps_item1 * item1_vec[k]);
+			double item2_dir = step_size * (-grad * user_vec[k] + l / (double)n_comps_item2 * item2_vec[k]);
 
             /*
             if ((user_dir != user_dir) || (item1_dir != item1_dir) || (item2_dir != item2_dir))
@@ -269,15 +269,14 @@ bool Problem::sgd_step(const comparison& comp, const double l, const double step
                                          n_comps_user, n_comps_item1, n_comps_item2);
             */
 
+            //#pragma omp atomic
+			user_vec[k]  -= user_dir;
 
-            // #pragma omp atomic
-			user_vec[k]  -= step_size * user_dir;
+            //#pragma omp atomic
+			item1_vec[k] -= item1_dir;
 
-            // #pragma omp atomic
-			item1_vec[k] -= step_size * item1_dir;
-
-            // #pragma omp atomic
-			item2_vec[k] -= step_size * item2_dir;
+            //#pragma omp atomic
+			item2_vec[k] -= item2_dir;
 		}
 
 		return true;
@@ -354,6 +353,7 @@ void Problem::run_sgd_nomad() {
 		double ndcg = compute_ndcg();
 		double test_err = compute_testerror();
 	}
+
 
 }
 
