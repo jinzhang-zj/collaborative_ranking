@@ -329,16 +329,23 @@ void Problem::run_sgd_random() {
         for(int k=0; k<rank; k++) printf("%5.2f ", V[k]); printf("\n");
         */
       
-        printf("%d iterations, %f test error\n", (icycle+1) * n_iter * n_threads, this->compute_testerror());
+        printf("%d updates, %f test error\n", (icycle+1) * n_max_updates * n_threads, this->compute_testerror());
     
     }
 }
 
 void Problem::run_sgd_nomad() {
 
-    if (!is_clustered) {
-		this->g.cluster();		// call graph clustering prior to the computation
-		is_clustered = true;
+    if (this->nparts != 1) {
+		if (!is_clustered) {
+			this->g.cluster();		// call graph clustering prior to the computation
+			is_clustered = true;
+		}
+	} else {
+		this->g.pcmp = this->g.ucmp;
+		this->g.pidx.resize(2);
+		this->g.pidx[0] = 0;
+		this->g.pidx[1] = this->n_train_comps;
 	}
 
     auto real_rand = std::bind(std::uniform_real_distribution<double>(0,1), std::mt19937(time(NULL)));
@@ -352,9 +359,9 @@ void Problem::run_sgd_nomad() {
     int n_threads = g.nparts;
     int n_max_updates = n_train_comps*10/n_threads;
 
-    std::array<std::queue<int>, n_threads> user_queue;
+    std::vector<std::queue<int> > user_queue(n_threads);
     for(int i=0; i<n_threads; ++i) {
-    	for(int j=pidx[i]; j<pidx[i+1]; ++j) {
+    	for(int j=g.pidx[i]; j<g.pidx[i+1]; ++j) {
     		user_queue[i].push(j);
     	}
     }
@@ -373,9 +380,10 @@ void Problem::run_sgd_nomad() {
 
         while((!flag) && (n_updates < n_max_updates)) {
         	if (!user_queue[tid].empty()) {
-	        	int idx = user_queue[tid].pop();
+	        	int idx = user_queue[tid].front();
 		        sgd_step(g.pcmp[idx], lambda, alpha / (1. + beta * (double)n_updates) / (double)n_threads);
-		        user_queue[(tid+1)%n_threads].push(idx);
+                user_queue[(tid+1)%n_threads].push(idx);
+                user_queue[tid].pop();
 		        ++n_updates;        		
         	}
 	    }
@@ -398,7 +406,7 @@ void Problem::run_sgd_nomad() {
         for(int k=0; k<rank; k++) printf("%5.2f ", V[k]); printf("\n");
         */
       
-        printf("%d iterations, %f test error\n", (icycle+1) * n_iter * n_threads, this->compute_testerror());
+        printf("%d updates, %f test error\n", (icycle+1) * n_max_updates * n_threads, this->compute_testerror());
     
     }
 
@@ -454,11 +462,17 @@ int main (int argc, char* argv[]) {
 	omp_set_dynamic(0);
 	omp_set_num_threads(nr_threads);
 	double start = omp_get_wtime();
-	p.alt_rankSVM();
-	double m1 = omp_get_wtime() - start;
-	printf("%d threads, rankSVM takes %f seconds\n", nr_threads, m1);
-	p.run_sgd_random();
-	double m2 = omp_get_wtime() - start - m1;
+    //p.alt_rankSVM();
+	//double m1 = omp_get_wtime() - start;
+	//printf("%d threads, rankSVM takes %f seconds\n", nr_threads, m1);
+	
+    p.run_sgd_random();
+	double m2 = omp_get_wtime() - start;
 	printf("%d threads, randSGD takes %f seconds\n", nr_threads, m2);
-	return 0;
+
+    p.run_sgd_nomad();
+    double m3 = omp_get_wtime() - start - m2;
+    printf("%d threads, randSGD takes %f seconds\n", nr_threads, m3);
+ 
+    return 0;
 }
