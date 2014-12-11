@@ -392,6 +392,7 @@ void Problem::run_sgd_nomad() {
 
         }
 
+
         /*
             printf("%d %d %d %d %d %d %f \n", g.ucmp[idx].user_id,  n_comps_by_user[g.ucmp[idx].user_id],
                                               g.ucmp[idx].item1_id, n_comps_by_item[g.ucmp[idx].item1_id],
