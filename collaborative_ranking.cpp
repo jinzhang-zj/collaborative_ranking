@@ -457,23 +457,23 @@ int main (int argc, char* argv[]) {
 	}
 
 	int nr_threads = atoi(argv[3]);
-	int nparts = (nr_threads > 1) ? nr_threads + 1 : nr_threads;	// if it's one thread, there is not need to run graclus
-	Problem p(10, nparts);		// rank = 10
+
+	Problem p(10, nr_threads);		// rank = 10
 	p.read_data(argv[1], argv[2]);
 	omp_set_dynamic(0);
 	omp_set_num_threads(nr_threads);
 	double start = omp_get_wtime();
-    //p.alt_rankSVM();
-	//double m1 = omp_get_wtime() - start;
-	//printf("%d threads, rankSVM takes %f seconds\n", nr_threads, m1);
+    	p.alt_rankSVM();
+	double m1 = omp_get_wtime() - start;
+	printf("%d threads, rankSVM takes %f seconds\n", nr_threads, m1);
 	
-    p.run_sgd_random();
-	double m2 = omp_get_wtime() - start;
-	printf("%d threads, randSGD takes %f seconds\n", nr_threads, m2);
+    //p.run_sgd_random();
+//	double m2 = omp_get_wtime() - start;
+//	printf("%d threads, randSGD takes %f seconds\n", nr_threads, m2);
 
-    p.run_sgd_nomad();
-    double m3 = omp_get_wtime() - start - m2;
-    printf("%d threads, randSGD takes %f seconds\n", nr_threads, m3);
+//  p.run_sgd_nomad();
+//    double m3 = omp_get_wtime() - start - m2;
+//    printf("%d threads, randSGD takes %f seconds\n", nr_threads, m3);
  
     return 0;
 }
