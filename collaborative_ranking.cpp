@@ -301,7 +301,7 @@ void Problem::run_sgd_random() {
 
     printf("Initial test error : %f \n", this->compute_testerror());
  
-    for(int icycle=0; icycle<100; ++icycle) {
+    for(int icycle=0; icycle<10; ++icycle) {
  
         #pragma omp parallel
         {
@@ -346,6 +346,8 @@ void Problem::run_sgd_nomad() {
 		this->g.pidx.resize(2);
 		this->g.pidx[0] = 0;
 		this->g.pidx[1] = this->n_train_comps;
+        this->g.p2idx.resize(1);
+        this->g.p2idx[0] = this->g.uidx;
 	}
 
     auto real_rand = std::bind(std::uniform_real_distribution<double>(0,1), std::mt19937(time(NULL)));
@@ -361,14 +363,15 @@ void Problem::run_sgd_nomad() {
 
     std::vector<std::queue<int> > user_queue(n_threads);
     for(int i=0; i<n_threads; ++i) {
-    	for(int j=g.pidx[i]; j<g.pidx[i+1]; ++j) {
+    	for(int j=(n_users*i/n_threads); j<(n_users*(i+1)/n_threads); ++j) {
     		user_queue[i].push(j);
     	}
+        printf("%d %d %d \n", i, user_queue[i].front(), user_queue[i].back());
     }
 
     printf("Initial test error : %f \n", this->compute_testerror());
  
-    for(int icycle=0; icycle<100; ++icycle) {
+    for(int icycle=0; icycle<10; ++icycle) {
  
  		bool flag = false;
 
@@ -378,13 +381,16 @@ void Problem::run_sgd_nomad() {
         int tid = omp_get_thread_num();
         int n_updates = 1;
 
+        printf("thread %d beginning : users %d - %d  \n", tid, user_queue[tid].front(), user_queue[tid].back());
         while((!flag) && (n_updates < n_max_updates)) {
         	if (!user_queue[tid].empty()) {
-	        	int idx = user_queue[tid].front();
-		        sgd_step(g.pcmp[idx], lambda, alpha / (1. + beta * (double)n_updates) / (double)n_threads);
-                user_queue[(tid+1)%n_threads].push(idx);
+	        	int uid = user_queue[tid].front();
+                for(int idx=g.p2idx[tid][uid]; idx<g.p2idx[tid][uid+1]; ++idx) {
+		            sgd_step(g.pcmp[idx], lambda, alpha / (1. + beta * (double)n_updates) / (double)n_threads);
+                    ++n_updates;
+                }
+                user_queue[(tid+1)%n_threads].push(uid);
                 user_queue[tid].pop();
-		        ++n_updates;        		
         	}
 	    }
 
