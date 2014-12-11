@@ -11,6 +11,7 @@
 //
 // Run: ./a.out [rating_file] [rating_format] [graph_output] [num_partitions]
 
+#include <queue>
 #include <random>
 #include <functional>
 #include <omp.h>
@@ -259,9 +260,9 @@ bool Problem::sgd_step(const comparison& comp, const double l, const double step
 		double grad = -2. * err;		// gradient direction for l2 hinge loss
 
 		for(int k=0; k<rank; k++) {
-			double user_dir  = (grad * (item1_vec[k] - item2_vec[k]) + l / (double)n_comps_user * user_vec[k]);
-			double item1_dir = (grad * user_vec[k] + l / (double)n_comps_item1 * item1_vec[k]);
-			double item2_dir = (-grad * user_vec[k] + l / (double)n_comps_item2 * item2_vec[k]);
+			double user_dir  = step_size * (grad * (item1_vec[k] - item2_vec[k]) + l / (double)n_comps_user * user_vec[k]);
+			double item1_dir = step_size * (grad * user_vec[k] + l / (double)n_comps_item1 * item1_vec[k]);
+			double item2_dir = step_size * (-grad * user_vec[k] + l / (double)n_comps_item2 * item2_vec[k]);
 
             /*
             if ((user_dir != user_dir) || (item1_dir != item1_dir) || (item2_dir != item2_dir))
@@ -269,15 +270,14 @@ bool Problem::sgd_step(const comparison& comp, const double l, const double step
                                          n_comps_user, n_comps_item1, n_comps_item2);
             */
 
+            //#pragma omp atomic
+			user_vec[k]  -= user_dir;
 
-            // #pragma omp atomic
-			user_vec[k]  -= step_size * user_dir;
+            //#pragma omp atomic
+			item1_vec[k] -= item1_dir;
 
-            // #pragma omp atomic
-			item1_vec[k] -= step_size * item1_dir;
-
-            // #pragma omp atomic
-			item2_vec[k] -= step_size * item2_dir;
+            //#pragma omp atomic
+			item2_vec[k] -= item2_dir;
 		}
 
 		return true;
@@ -297,7 +297,7 @@ void Problem::run_sgd_random() {
     lambda = 1.;
 
     int n_threads = g.nparts;
-    int n_iter = n_train_comps*10/n_threads;
+    int n_max_updates = n_train_comps*10/n_threads;
 
     printf("Initial test error : %f \n", this->compute_testerror());
  
@@ -309,8 +309,8 @@ void Problem::run_sgd_random() {
         std::mt19937 gen(omp_get_thread_num());
         std::uniform_int_distribution<int> randidx(0, n_train_comps-1);
 
-        for(int iter=1; iter<n_iter; iter++) { 
-            sgd_step(g.ucmp[randidx(gen)], lambda, alpha / (1. + beta * (double)iter) / (double)n_threads);
+        for(int n_updates=1; n_updates<n_max_updates; ++n_updates) { 
+            sgd_step(g.ucmp[randidx(gen)], lambda, alpha / (1. + beta * (double)n_updates) / (double)n_threads);
         }
 
         }
@@ -329,31 +329,88 @@ void Problem::run_sgd_random() {
         for(int k=0; k<rank; k++) printf("%5.2f ", V[k]); printf("\n");
         */
       
-        printf("%d iterations, %f test error\n", (icycle+1) * n_iter * n_threads, this->compute_testerror());
+        printf("%d updates, %f test error\n", (icycle+1) * n_max_updates * n_threads, this->compute_testerror());
     
     }
 }
 
 void Problem::run_sgd_nomad() {
 
-    if (!is_clustered) {
-		this->g.cluster();		// call graph clustering prior to the computation
-		is_clustered = true;
+    if (this->nparts != 1) {
+		if (!is_clustered) {
+			this->g.cluster();		// call graph clustering prior to the computation
+			is_clustered = true;
+		}
+	} else {
+		this->g.pcmp = this->g.ucmp;
+		this->g.pidx.resize(2);
+		this->g.pidx[0] = 0;
+		this->g.pidx[1] = this->n_train_comps;
 	}
 
-	srand(time(NULL));
-	for(int i=0; i<n_users*rank; i++) U[i] = ((double)rand()/(RAND_MAX));
-	for(int i=0; i<n_items*rank; i++) V[i] = ((double)rand()/(RAND_MAX));
+    auto real_rand = std::bind(std::uniform_real_distribution<double>(0,1), std::mt19937(time(NULL)));
+	for(int i=0; i<n_users*rank; i++) U[i] = real_rand();
+	for(int i=0; i<n_items*rank; i++) V[i] = real_rand();
 
-	int n_iter = 10;
-	for(int iter=1; iter<n_iter; iter++) {
-		int idx = (int)((double)rand() * (double)n_train_comps / (double)RAND_MAX);
+    alpha = .1;
+    beta  = .1;
+    lambda = 1.;
 
-		sgd_step(g.pcmp[idx], lambda, alpha / (1. + beta * (double)iter));
+    int n_threads = g.nparts;
+    int n_max_updates = n_train_comps*10/n_threads;
 
-		double ndcg = compute_ndcg();
-		double test_err = compute_testerror();
-	}
+    std::vector<std::queue<int> > user_queue(n_threads);
+    for(int i=0; i<n_threads; ++i) {
+    	for(int j=g.pidx[i]; j<g.pidx[i+1]; ++j) {
+    		user_queue[i].push(j);
+    	}
+    }
+
+    printf("Initial test error : %f \n", this->compute_testerror());
+ 
+    for(int icycle=0; icycle<100; ++icycle) {
+ 
+ 		bool flag = false;
+
+        #pragma omp parallel
+        {
+
+        int tid = omp_get_thread_num();
+        int n_updates = 1;
+
+        while((!flag) && (n_updates < n_max_updates)) {
+        	if (!user_queue[tid].empty()) {
+	        	int idx = user_queue[tid].front();
+		        sgd_step(g.pcmp[idx], lambda, alpha / (1. + beta * (double)n_updates) / (double)n_threads);
+                user_queue[(tid+1)%n_threads].push(idx);
+                user_queue[tid].pop();
+		        ++n_updates;        		
+        	}
+	    }
+
+	    flag = true;
+
+        }
+
+
+        /*
+            printf("%d %d %d %d %d %d %f \n", g.ucmp[idx].user_id,  n_comps_by_user[g.ucmp[idx].user_id],
+                                              g.ucmp[idx].item1_id, n_comps_by_item[g.ucmp[idx].item1_id],
+                                              g.ucmp[idx].item2_id, n_comps_by_item[g.ucmp[idx].item2_id],
+                                              alpha / (1. + beta*(double)iter));
+             
+            for(int k=0; k<rank; k++) printf("%5.2f ", U[g.ucmp[idx].user_id+k]); printf("\n");
+            for(int k=0; k<rank; k++) printf("%5.2f ", V[g.ucmp[idx].item1_id+k]); printf("\n");
+            for(int k=0; k<rank; k++) printf("%5.2f ", V[g.ucmp[idx].item2_id+k]); printf("\n");
+   
+        for(int k=0; k<rank; k++) printf("%5.2f ", U[k]); printf("\n");
+        for(int k=0; k<rank; k++) printf("%5.2f ", V[k]); printf("\n");
+        */
+      
+        printf("%d updates, %f test error\n", (icycle+1) * n_max_updates * n_threads, this->compute_testerror());
+    
+    }
+
 
 }
 
@@ -406,11 +463,17 @@ int main (int argc, char* argv[]) {
 	omp_set_dynamic(0);
 	omp_set_num_threads(nr_threads);
 	double start = omp_get_wtime();
-	p.alt_rankSVM();
-	double m1 = omp_get_wtime() - start;
-	printf("%d threads, rankSVM takes %f seconds\n", nr_threads, m1);
-	p.run_sgd_random();
-	double m2 = omp_get_wtime() - start - m1;
+    //p.alt_rankSVM();
+	//double m1 = omp_get_wtime() - start;
+	//printf("%d threads, rankSVM takes %f seconds\n", nr_threads, m1);
+	
+    p.run_sgd_random();
+	double m2 = omp_get_wtime() - start;
 	printf("%d threads, randSGD takes %f seconds\n", nr_threads, m2);
-	return 0;
+
+    p.run_sgd_nomad();
+    double m3 = omp_get_wtime() - start - m2;
+    printf("%d threads, randSGD takes %f seconds\n", nr_threads, m3);
+ 
+    return 0;
 }
