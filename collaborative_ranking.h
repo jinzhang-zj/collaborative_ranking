@@ -131,6 +131,16 @@ struct Graph {
 	}
 
 	void cluster() {
+        if (nparts == 1) {
+     		this->pcmp = this->ucmp;
+	    	this->pidx.resize(2);
+		    this->pidx[0] = 0;
+		    this->pidx[1] = omega;
+            this->p2idx.resize(1);
+            this->p2idx[0] = this->uidx;
+            return;
+        }
+ 
 		// write the adjacent file
 		int offset = 1;
 		char gfile[50];

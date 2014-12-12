@@ -108,16 +108,9 @@ void Problem::read_data (char* train_file, char* test_file) {
 }	
 
 void Problem::alt_rankSVM () {
-	if (this->nparts != 1) {
-		if (!is_clustered) {
-			this->g.cluster();		// call graph clustering prior to the computation
-			is_clustered = true;
-		}
-	} else {
-		this->g.pcmp = this->g.ucmp;
-		this->g.pidx.resize(2);
-		this->g.pidx[0] = 0;
-		this->g.pidx[1] = this->n_train_comps;
+	if (!is_clustered) {
+		this->g.cluster();		// call graph clustering prior to the computation
+		is_clustered = true;
 	}
 
 	double eps = 1e-8;
@@ -336,18 +329,9 @@ void Problem::run_sgd_random() {
 
 void Problem::run_sgd_nomad() {
 
-    if (this->nparts != 1) {
-		if (!is_clustered) {
-			this->g.cluster();		// call graph clustering prior to the computation
-			is_clustered = true;
-		}
-	} else {
-		this->g.pcmp = this->g.ucmp;
-		this->g.pidx.resize(2);
-		this->g.pidx[0] = 0;
-		this->g.pidx[1] = this->n_train_comps;
-        this->g.p2idx.resize(1);
-        this->g.p2idx[0] = this->g.uidx;
+	if (!is_clustered) {
+		this->g.cluster();		// call graph clustering prior to the computation
+		is_clustered = true;
 	}
 
     auto real_rand = std::bind(std::uniform_real_distribution<double>(0,1), std::mt19937(time(NULL)));
@@ -362,17 +346,15 @@ void Problem::run_sgd_nomad() {
     int n_max_updates = n_train_comps*10/n_threads;
 
     std::vector<std::queue<int> > user_queue(n_threads);
-    for(int i=0; i<n_threads; ++i) {
-    	for(int j=(n_users*i/n_threads); j<(n_users*(i+1)/n_threads); ++j) {
-    		user_queue[i].push(j);
-    	}
-        printf("%d %d %d \n", i, user_queue[i].front(), user_queue[i].back());
-    }
-
     printf("Initial test error : %f \n", this->compute_testerror());
  
     for(int icycle=0; icycle<10; ++icycle) {
- 
+
+        for(int i=0; i<n_threads; ++i) {
+            while(!user_queue[i].empty()) user_queue[i].pop();
+            for(int j=(n_users*i/n_threads); j<(n_users*(i+1)/n_threads); ++j) user_queue[i].push(j);
+        }
+
  		bool flag = false;
 
         #pragma omp parallel
@@ -381,9 +363,13 @@ void Problem::run_sgd_nomad() {
         int tid = omp_get_thread_num();
         int n_updates = 1;
 
-        printf("thread %d beginning : users %d - %d  \n", tid, user_queue[tid].front(), user_queue[tid].back());
+        //printf("thread %d beginning : users %d - %d  \n", tid, user_queue[tid].front(), user_queue[tid].back());
         while((!flag) && (n_updates < n_max_updates)) {
-        	if (!user_queue[tid].empty()) {
+        	if (n_updates < 10) {
+                printf("%d %d\n", tid, n_updates);
+            }
+            
+            if (!user_queue[tid].empty()) {
 	        	int uid = user_queue[tid].front();
                 for(int idx=g.p2idx[tid][uid]; idx<g.p2idx[tid][uid+1]; ++idx) {
 		            sgd_step(g.pcmp[idx], lambda, alpha / (1. + beta * (double)n_updates) / (double)n_threads);
@@ -469,17 +455,18 @@ int main (int argc, char* argv[]) {
 	omp_set_dynamic(0);
 	omp_set_num_threads(nr_threads);
 	double start = omp_get_wtime();
-    	p.alt_rankSVM();
+    
+	//p.alt_rankSVM();
 	double m1 = omp_get_wtime() - start;
-	printf("%d threads, rankSVM takes %f seconds\n", nr_threads, m1);
+	//printf("%d threads, rankSVM takes %f seconds\n", nr_threads, m1);
 	
-    //p.run_sgd_random();
-//	double m2 = omp_get_wtime() - start;
-//	printf("%d threads, randSGD takes %f seconds\n", nr_threads, m2);
+    p.run_sgd_random();
+	double m2 = omp_get_wtime() - start - m1;
+    printf("%d threads, randSGD takes %f seconds\n", nr_threads, m2);
 
-//  p.run_sgd_nomad();
-//    double m3 = omp_get_wtime() - start - m2;
-//    printf("%d threads, randSGD takes %f seconds\n", nr_threads, m3);
+    p.run_sgd_nomad();
+    double m3 = omp_get_wtime() - start - m2 - m1;
+    printf("%d threads, randSGD takes %f seconds\n", nr_threads, m3);
  
     return 0;
 }
