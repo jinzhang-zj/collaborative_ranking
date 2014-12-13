@@ -282,7 +282,7 @@ int myrandom (int i) {
 void trainU(problem* p, parameter* param, double* U, int iusr, double* alpha) {
 	vector<int> order(p->l);
 	double one_2C = 0.5 / param->C;
-	double maxiter = 10;
+	double maxiter = 1;
 	double eps = param->eps;
 	double oldQ = 0;
 
@@ -346,7 +346,7 @@ void trainU(problem* p, parameter* param, double* U, int iusr, double* alpha) {
 // w is V[iid1 .. iid1+rank], -V[iid2 .. iid2+rank]
 void trainV(problem* p, parameter* param, double* V, comparison& c, double* alpha ) {
 	double one_2C = 0.5 / param->C;
-	double maxiter = 10;
+	double maxiter = 1;
 	double eps = param->eps;
 	double oldQ = 0;  
 	feature_node* xi = p->x[0];
