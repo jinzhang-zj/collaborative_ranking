@@ -75,8 +75,8 @@ struct Graph {
 	vector<comparison> pcmp;		// pointer to array of comparisons sorted by partitions
 	vector<int> uidx;			// start/end indices of comparison data for each user
 	vector<int> pidx;			// start/end indices of comparison data for each partition
-	vector<vector<int> > p2idx;		// start/end indices of comparison data for each user in each partition
-	map<int, int> buckets;
+        vector<vector<int> > p2idx;		// start/end indices of comparison data for each user in each partition
+        map<int, int> buckets;
 
 	Graph(): nparts(0) {}
 	Graph(int np): nparts(np) {}
@@ -231,12 +231,13 @@ struct Graph {
 		// 2D indices for SGD
 		p2idx.resize(nparts);
 		for (int i = 0; i < nparts; ++i) {
-			p2idx[i].resize(n + 1, 0);
+			p2idx[i].resize(n+1,0);
 			for (int j = 0; j < tmp[i].size(); ++j) {
 				comparison cur = tmp[i][j];
 				int u = cur.user_id;
 				++p2idx[i][u + 1];
 			}
+            p2idx[i][0] = pidx[i];
 			for (int j = 1; j <= n; ++j) {
 				p2idx[i][j] += p2idx[i][j - 1];
 			}
@@ -249,6 +250,14 @@ struct Graph {
 				pcmp[pidx[i] + j] = tmp[i][j];
 			}
 		}
+
+/*
+        for(int i=0; i<nparts; ++i) {
+            for(int j=0; j<=n; ++j) {
+                printf("%d %d %d %d \n", p2idx[i][j], i, j, pcmp[p2idx[i][j]].user_id);
+            }
+        } 
+*/
 
 		for (int i = 0; i < nparts; ++i) {
 			printf("group %d, size %d\n", i, tmp[i].size() );
