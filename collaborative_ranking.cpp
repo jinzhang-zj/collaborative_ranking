@@ -438,7 +438,7 @@ void Problem::run_sgd_nomad() {
 
         double error = this->compute_testerror();
         if (error < 0.) break; 
-        printf("%f \n", error);
+        printf("%d: iter %d, error %f, time %f \n", n_threads, n_updates_total, error, omp_get_wtime() - time);
     }
 
     for(int i=0; i<n_threads; i++) delete[] queue[i];
@@ -516,12 +516,12 @@ int main (int argc, char* argv[]) {
 	double start = omp_get_wtime();
     
 	//p.alt_rankSVM();
-	double m1 = omp_get_wtime() - start;
+	//double m1 = omp_get_wtime() - start;
 	//printf("%d threads, rankSVM takes %f seconds\n", nr_threads, m1);
 	
-    //p.run_sgd_random();
+    p.run_sgd_random();
 	double m2 = omp_get_wtime() - start - m1;
-    //printf("%d threads, randSGD takes %f seconds\n", nr_threads, m2);
+    printf("%d threads, randSGD takes %f seconds\n", nr_threads, m2);
 
     p.run_sgd_nomad();
     double m3 = omp_get_wtime() - start - m2 - m1;
